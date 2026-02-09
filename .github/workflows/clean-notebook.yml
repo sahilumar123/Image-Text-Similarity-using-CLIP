@@ -1,0 +1,50 @@
+name: Auto Fix Jupyter Notebook Metadata
+
+on:
+  push:
+    paths:
+      - "**/*.ipynb"
+
+jobs:
+  clean-notebook:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install nbformat
+        run: pip install nbformat
+
+      - name: Clean notebook metadata
+        run: |
+          python - << 'EOF'
+          import json, glob
+
+          for file in glob.glob("**/*.ipynb", recursive=True):
+              with open(file, "r", encoding="utf-8") as f:
+                  nb = json.load(f)
+
+              nb.get("metadata", {}).pop("widgets", None)
+
+              for cell in nb.get("cells", []):
+                  cell.get("metadata", {}).pop("widgets", None)
+
+              with open(file, "w", encoding="utf-8") as f:
+                  json.dump(nb, f, indent=2)
+
+              print(f"Cleaned {file}")
+          EOF
+
+      - name: Commit cleaned notebooks
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add .
+          git commit -m "Auto-clean notebook metadata" || echo "No changes to commit"
+          git push
